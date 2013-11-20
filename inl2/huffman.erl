@@ -1,11 +1,14 @@
 -module(huffman).
 -export([test/0, table/1, encode/2, decode/2]).
+-include("lipsum.hrl").
 
 sample() ->
-	"the quick brown fox jumps over the lazy dog this is a sample text that we will use when we build up a table we will only handle lower case letters and no punctuation symbols the frequency will of course not represent english but it is probably not that far off".
+	%"the quick brown fox jumps over the lazy dog this is a sample text that we will use when we build up a table we will only handle lower case letters and no punctuation symbols the frequency will of course not represent english but it is probably not that far off".
+	?LIPSUM.
 
 text() ->
-	"this is somthing that we should encode".
+	%"this is somthing that we should encode".
+	?LIPSUM.
 
 freq_increase_or_add(Key, null) ->
 	{node, Key, 1, null, null};
@@ -41,10 +44,8 @@ freq_resort({node, K, V, Left, Right}, Tree) ->
 freq_pop_lowest(null) ->
 	null;
 freq_pop_lowest({node, K, V, null, R}) ->
-	io:format("found ~w~n", [V]),
 	{freq, K, V, R};
 freq_pop_lowest({node, K, V, L, R}) ->
-	io:format("found ~w~n", [V]),
 	{freq, Key, Value, Tree} = freq_pop_lowest(L),
 	{freq, Key, Value, {node, K, V, Tree, R}}.
 
@@ -100,7 +101,16 @@ decode(Seq, Tree, {fulhakk, Key, _}) ->
 
 test() ->
 	Sample = sample(),
-	{Table, Tree} = table(Sample),
+	{timer, TimeTable, {Table, Tree}} = time(fun() -> table(Sample) end),
 	Text = text(),
-	Seq = encode(Text, Table),
-	decode(Seq, Tree),
+	{timer, TimeEnc, Seq} = time(fun() -> encode(Text, Table) end),
+	{timer, TimeDec, Out} = time(fun() -> decode(Seq, Tree) end),
+	io:format("built table ~w us~nencoded to ~w bits ~w us~nraw ~w bits, decoded ~w us~n", [TimeTable, length(Seq), TimeEnc, length(Text)*8, TimeDec]),
+	%Out.
+
+time(Fun)->
+	%% time in micro seconds
+	T1 = now(),
+	Res = Fun(),
+	T2 = now(),
+	{timer, timer:now_diff(T2, T1), Res}.
