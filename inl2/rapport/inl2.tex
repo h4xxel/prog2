@@ -1,0 +1,70 @@
+%% En enkel mall för att skapa en labb-raport.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} 
+\usepackage[swedish]{babel}
+\usepackage{verbatim}
+
+\renewcommand{\figurename}{Tabell }
+
+\title{Inlämningsuppgift Laboration 2}
+\author{Axel Isaksson}
+\date{2013-11-13} 
+
+\begin{document}
+
+\maketitle 
+
+\section{Uppgiften}
+
+\paragraph{Huffmankodning}
+
+
+\section{Ansatts}
+
+Om du vill ta med kod för att illustrera ett exempel så kan du göra det så här:
+
+\begin{verbatim}
+this(X) ->
+    Y = is(X),
+    a(test(Y)).
+\end{verbatim}
+
+Var noga med att inte använda tabbar i koden, dessa kommer endast att
+tolkas som ett mellanslag och indenteringen kommer att bli helt fel. 
+
+\section{Utvärdering}
+
+Uppgifterna i denna kurs kanske inte kräver en utvärdering men man kan
+här visa resultat från testkörningar mm. Om man vill lägga in resultat
+från testkörningar kan man sammanfatta dessa i en tabell. Ett exempel
+kan ses i tabell \ref{tab:results}. 
+
+
+\begin{table}
+\centering
+\begin{tabular}{|l|r|r|}  
+\hline
+kärnor & tid & uppsnabbning\\
+\hline
+1 & 400ms & 1\\
+\hline
+2 & 240ms & 1.7\\
+\hline
+4 & 140ms & 2.8\\
+\hline
+\end{tabular}
+\caption{Ha alltid en rad som förklarar vad tabellen handlar om.}
+\label{tab:results}
+\end{table}
+
+Om ni vill ha med en graf så rekommenderas ni att använda gnuplot. Om
+ni lär er använda det för att göra enkla diagram så kommer ni ha
+mycket nytta av det i framtiden.
+
+
+\section{Sammanfattning}
+
+Vad gick bra och vad gick mindre bra? Vad var de största problemen och
+hur löstes de? Skriv en kort sammanfattning.
+
+\end{document}

@@ -1,0 +1,260 @@
+%% En enkel mall för att skapa en labb-raport.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} 
+\usepackage[swedish]{babel}
+\usepackage{verbatim}
+
+\renewcommand{\figurename}{Tabell }
+
+\title{Inlämningsuppgift Laboration 1}
+\author{Axel Isaksson}
+\date{2013-11-13} 
+
+\begin{document}
+\maketitle 
+
+\section{Uppgiften}
+
+Uppgiften bestod av tre deluppgifter:
+\begin{itemize}
+    \item Vända på en lista
+    \item Omvandla ett heltal till en lista med binära bitar
+    \item Räkna fibonacci-tal
+\end{itemize}
+
+\paragraph\
+Den första uppgiften gick ut på att på två olika sätt vända på en lista.
+(Det första elementet skulle hamna sist och det sista först.)
+Detta skulle göras på två olika sätt; genom att succesivt ta bort det första
+elementet, anropa sig själv för att vända på resten av listan, och sedan
+lägga till det borttagna elementet sist till den vända listan, och genom att
+använda sig av en ackumulatorlista där man som med en kortlek tar det
+översta elementet och lägger på toppen av ackumulatorlistan som sedan blir
+den nya, vända listan. Dessa två metoder skulle jämföras i snabbhet genom
+en färdigskriven benchmark-funktion.
+
+\paragraph\
+Den andra uppgiften gick ut på att, på två valfria sätt, omvanda ett heltal
+till en lista med binära bitar. Talet $369_{10} = 101110001_{2}$ skulle
+alltså generera listan \emph{[1, 0, 1, 1, 1,0, 0, 0, 1]}. Fördelar/nackdelar
+med de olika metoderna skulle diskuteras.
+
+\paragraph\
+Den tredje uppgiften gick ut på att skriva en funktion som ränknar fram
+fibonaccinummer och mäta funktionens prestanda genom att anpassa benchmark\-
+funktionen från första uppgiften. 
+
+\section{Ansats}
+
+\subsection{Första uppgiften}
+
+\paragraph\
+Koden till dena uppgift var i stort sett redan given i uppgiften. De två
+funktionerna \emph{nreverse} och \emph{reverse} skulle jämföras
+prestandamässigt.
+
+\paragraph{nreverse}
+\begin{verbatim}
+nreverse([]) -> [];
+nreverse([H|T]) -> nreverse(T) ++ [H].
+\end{verbatim}
+
+Funktionen \emph{nreverse}, en naiv approach till att vända en lista. Den vända
+listan erhålles genom att det första elementet, \emph H, tas bort från
+listan och läggs till på slutet av den vända lista som erhålles genom att
+rekursivt anropa sig själv med resten av listan, utan det första elementet.
+
+\paragraph{reverse}
+\begin{verbatim}
+reverse(L) -> reverse(L, []).
+reverse([], R) -> R;
+reverse([H|T], R) -> reverse(T, [H|R]).
+\end{verbatim}
+
+Funktionen \emph{reverse}, en bättre lösning på problemet. Här används listan
+\emph R som en ackumulator som skickas med i varje funktionsanrop och som
+växer och bildar den nya, omvända listan.
+Funktionen kan liknas vid att ta ett kort från toppen av en kortlek och placera
+i en ny hög. När alla kort dragits från toppen av ursprungshögen och placerats
+på toppen av ackumulatorhögen kommer ordningen i ackumulatorn vara omvänd
+jämtemot ursprungshögen.
+Då funktionen måste ta två argument, en arbetslista och en ackumulatorlista,
+finns också en wrapperfunktion som bara tar ett argument för att förenkla
+användning och göra funktionen kompatibel med nreverse.
+
+\paragraph\
+Benchmarkfunktionen fungerar på så sätt att den skapar ett flertal listor
+av ökande längd, anropar funktionerna reverse och nreverse på varje lista,
+och mäter tiden det tar för funktionen att bli klar.
+
+\subsection{Andra uppgiften}
+
+\paragraph\
+I denna uppgift skulle man på två olika, valfria sätt konvertera ett heltal
+till en lista med binära bitar (ex \emph{[1, 0, 0, 1, 1]}).
+
+\paragraph{Bitshift}
+\begin{verbatim}
+unpack1(Bin) -> unpack1(Bin, []).
+unpack1(0, []) -> [0];
+unpack1(0, Acc) -> Acc;
+unpack1(Bin, Acc) -> unpack1(Bin bsr 1, [Bin band 1 | Acc]).
+\end{verbatim}
+
+Då jag programmerat mycket i C tidigare var denna lösningen den direkt
+uppenbara för mig. Talet shiftas ner, en bit i taget, och logiskt AND utförs
+för att maska ut den lägsta biten, som sedan läggs till ackumulatorlistan
+\emph{Acc}. Jag var tungen att lägga till matchning mot talet 0 med tom
+ackumulator för att en lista med en nolla (\emph{[0]}) skulle returneras
+istället för en tom lista.
+
+\paragraph{Inbyggda funktioner}
+\begin{verbatim}
+unpack2(Bin) ->
+    lists:map(fun(C) -> C - 48 end, integer_to_list(Bin, 2)).
+\end{verbatim}
+
+I min andra lösning använder jag mig av den inbyggda funktionen
+\emph{integer\_to\_list} som gör om ett heltal till en lista i en given bas.
+Här användes basen två, vilket returnerar en lista med utskrivbara tecken,
+som kan representeras som en \emph{sträng} likt "10010101", vilket inte
+riktigt vad det som söktes, varför följande lösning på problemet konstruerades:
+\emph{lists:map} utför en funktion på varje element i listan; i detta fall
+en annonym funktion som konverterar tecknet "n"
+(ASCII 48 = '0', ASCII 49 = '1') till heltalet n.
+Således: $'1' - 48 = 1$.
+
+\subsection{Tredje uppgiften}
+
+\paragraph\
+Denna uppgift gick ut på att skriva en funktion som räknar fram fibonacci\-
+nummer (de två första nummren är 0, 1, varje övrigt nummer kan konstrueras
+genom att addera ihop de två tidigare). Jag valde att göra två olika funktioner
+som räknar fram numren på lite olika sätt, för att jämföra dem mot varandra.
+Den första är rekursiv och väldigt naiv. För varje tal som ska räknas ut
+anropar den sig själv två gånger, för att hitta de två föregående talen i
+serien och adderar sedan ihop dem. Den andra funktionen använder en
+iterativ approach, även om jag här implementerade den som en rekursiv loop.
+
+\paragraph{Iterativ fibonacci}
+\begin{verbatim}
+fib1(N) -> fib1(0, 1, N).
+fib1(Fib1, _, 0) -> Fib1;
+fib1(Fib1, Fib2, N) -> fib1(Fib2, Fib1 + Fib2, N - 1).
+\end{verbatim}
+
+Denna funktion anropas med de två starttalen \emph 0 och \emph 1 och räknar
+fibonaccitalen uppåt samtidigt som \emph N används som räknare som räknas
+ner till 0 och det sökta talet i serien har hittats.
+På detta sätt behöver varje tal bara räknas ut en gång, till skilnad mot den
+förra lösningen.
+
+\section{Utvärdering}
+
+\subsection{Första uppgiften}
+
+\begin{table}
+\centering
+\begin{tabular}{|l|r|r|}  
+\hline
+Listlängd & Tid nreverse ($\mu s$) & Tid reverse ($\mu s$)\\\hline
+    16  & 225          & 48   \\\hline
+    32  & 662	       & 73   \\\hline
+    64  & 2591	       & 98   \\\hline
+    128 & 11014        & 246  \\\hline
+    256 & 18624        & 164  \\\hline
+    512 & 65010        & 273  \\\hline
+
+\end{tabular}
+\caption{Exekveringstid för funktionerna 
+    \emph{nreverse} och \emph{reverse}}
+\label{tab:uppg1}
+\end{table}
+
+\paragraph\
+I tabellen \ref{tab:uppg1} kan vi se att funktionen \emph{reverse} är
+betydligt snabbare än den naivare men mer straight-forward \emph{nreverse}.
+Detta beror på ett flertal saker:
+
+\begin{itemize}
+    \item \emph{nreverse} skapar i ihopslagningen i varje steg en kopia av hela
+        listan som sedan ändå tas bort på en gång i och med append (++).
+        \emph{reverse} använder istället en ackumulator som skickas med i varje
+        anrop och som i varje steg används som svans vid skapandet av den nya
+        ackumulatorlistan vilken bara får en ny första post med cons-operatorn.
+        Detta har konstant tidskomplexitet.
+    \item \emph{reverse} är svansrekursiv; den gör inget mer med sitt
+        returvärde än att returnera det vilket leder till bättre optimering,
+        mindre minnesanvändning och därför mindre overhead än \emph{nreverse}.
+\end{itemize}
+
+\subsection{Andra uppgiften}
+
+\paragraph\
+I denna uppgift väljer jag att kalla min första lösning för ``den bättre''
+av dem. Kanske för att jag är van vid det sättet att manipulera bitar, men
+också då funktionen bara behöver gå igenom varje bit en gång och gör allt i
+en enda loop. Även om det är tillfresställande med enradslösningar som min
+andra alternativa lösning är den varken särskilt snygg eller särskilt
+effektiv då den först måste konvertera numret till en sträng av 1:or och 0:or
+och sedan gå igenom igen och konvertera varje tecken i strängen till ett tal.
+
+\subsection{Tredje uppgiften}
+
+\paragraph\
+När jag kör benchmark för mina två olika implementationer av fibonicci\-
+räknaren är det direkt väldigt tydligt att den andra, iterativa varianten
+är direkt överlägsen.
+Min snabbare implementation av fibonacciräknaren räknar ut det 500000:e talet
+på ungefär hälften av tiden som det tar den långsammare implementationen att
+räkna ut det 40:e. Anledningen till att det är så är lätt att se om man tittar
+i koden: den långsamma implementationen med rekursiv approach börjar uppifrån
+och anropar sig själv två gånger för att ta reda på de två tidigare talen i
+serien; dessa anrop anropar i sin tur sig själv ytterligare två gånger vardera
+för att hitta sina två tidigare tal, och tal som man redan räknat ut
+``återanvänds'' inte utan räknas ut igen när de behövs. Detta leder till
+kvadratisk tidskomplexitet, vilket framgår i tabell \ref{tab:uppg3}.
+
+\paragraph\
+Den snabbare implementationen börjar istället från nedifrån och räknar ut
+talen tills den når det sökta, vilket ger den linjär tidskomplexitet.
+En funktion för att estimera tidsåtgång kan approximeras till
+${8n\over{5}} \times{10^{-6}} s$.
+
+\begin{table}
+\centering
+\begin{tabular}{|l|r||l|r|}  
+\hline
+Fib\# & Tid naiv fibonacci ($\mu s$) & Fib\# & Tid snabb fibonacci ($\mu s$)\\
+\hline
+    20  & 8297          & 2000  & 2690 \\\hline
+    22  & 10021	        & 2200  & 1763 \\\hline
+    24  & 26792	        & 2400  & 1714 \\\hline
+    26  & 68669         & 2600  & 1892 \\\hline
+    28  & 179195        & 2800  & 2158 \\\hline
+    30  & 469932        & 3000  & 2458 \\\hline
+    32  & 1229740       & 3200  & 2732 \\\hline
+    34  & 3217523       & 3400  & 3004 \\\hline
+    36  & 8454301       & 3600  & 3316 \\\hline
+    38  & 22166482      & 3800  & 3677 \\\hline
+    40  & 57957391      & 4000  & 4065 \\\hline
+
+\end{tabular}
+\caption{Exekveringstid för olika fibonacciräknare}
+\label{tab:uppg3}
+\end{table}
+
+\section{Sammanfattning}
+
+\paragraph\
+Sammanfattningsvis tycker jag att uppgifterna gått bra och utan allt för mycket
+krångel. Resultaten som erhölls var vad som kunde förväntas och de mindre
+avvikelserna som visas i tabellerna ovan kan förklaras med att det behövs
+funktionsoverhead som gör sig extra tydlig för små tal.
+Det svåraste var att komma över tröskeln och börja tänka funktionellt,
+då jag är van vid imperativa språk som C. Det verkar dock finnas en hel del
+dokumentation om erlang som hjälper en att komma igång och erlang-skalet
+är väldigt användbart för att snabbt kunna testa olika funktioner och
+nya idéer.
+
+\end{document}
