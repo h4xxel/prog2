@@ -8,7 +8,7 @@
 
 \title{Inlämningsuppgift Laboration 2}
 \author{Axel Isaksson}
-\date{2013-11-13} 
+\date{2013-11-20} 
 
 \begin{document}
 
@@ -17,62 +17,187 @@
 \section{Uppgiften}
 
 \paragraph{Huffmankodning}
+Uppgiften gick ut på att implementera en algoritm; huffmankodning; som är
+en enkel komprimeringsalgoritm lämpad för vanlig text. Komprimeringen
+går ut på att komprimera olika tecken (bokstäver) med olika längd som beror
+på hur ofta de förekommer i texten. Detta görs utan att en speciell separator,
+eller prefix måste infogas som avskiljare mellan varje tecken, vilket gör att
+varje bitsträng som representerar ett tecken kan packas direkt inpå föregående.
 
+\paragraph\
+I uppgiften ingick också att mäta prestandan på implementationen för stora
+texter.
 
 \section{Ansatts}
 
-Om du vill ta med kod för att illustrera ett exempel så kan du göra det så här:
+\paragraph\
+Huffmankodning använder sig av ett träd för att representera ett teckens
+bitsträng. I detta träd ligger varje tecken som ett löv, där ofta förekommande
+tecken ligger närmare roten, och vägen genom trädet till lövet motsvarar bitar
+i strängen; i min lösning betyder vänstergren en binär nolla och högergren en
+binär etta.
 
+\paragraph\
+Detta träd byggs upp utifrån en exempeltext, för vilken en frekvenstabell över
+förekommande tecken skapas. Denna frekvenstabell ordnas som en prioritetskö
+där tecknen med lägst frekvens prioriteras längst fram i kön.
+Huffmanträdet skapas sedan genom att extrahera de två första elementen från
+kön, skapa en nod i trädet vars barn är de två elementen, sätta nodens
+"prioritet" till summan av de två barnens. Denna nod placeras sedan på rätt
+ställe i prioritetskön. Processen upprepas tills endast ett element återstår:
+rotnoden.
+
+\paragraph\
+När huffmanträdet är skapat gås det igenom, och en tabell upprättas över alla
+tecken och deras bitsträngar (som ges av tecknets sökväg i trädet, enligt
+ovan). Kodning (komprimering) av text sker genom att texten gås igenom,
+tecken för tecken, och varje tecken ersätts av sin respektive bitstäng
+(tätt packad på föregående). Avkodning (dekomprimering) sker enklast genom
+att använda huffmanträdet, och genom att för varje bit på indatan gå till
+antingen höger eller vänster i trädet. När ett löv nås kan bitsträngen
+ersättas med ett tecken, och processen startar om med nästa bit från
+trädets rot.
+
+\paragraph\
+I min implementation använder jag ett binärt sökträd för att representera
+frekvenstabellen. Trädet är först sorterat på nyckel (bokstavens/tecknets
+motsvarighet i ASCII). Detta gör att det går (relativt) fort att söka
+igenom exempeltexten och bygga tabellen. När texten är genomsökt sorteras
+trädet om efter värde (frekvens) istället för nyckel. Detta gör att trädet
+nu enkelt kan användas som en prioritetskö, där elementet med lägst frekvens
+(högst prioritet) finns längst ner till vänster.
+
+\paragraph\
+Jag bygger nu huffmanträdet genom att extrahera de två elementen med lägst
+frekvens enligt förklaring ovan. För att kunna hålla koll på trädet som
+konstrueras, och för att kunna lägga tillbaka de skapade föräldernoderna
+i prioritetskön, utan att deras barnnoder som redan är förbrukade ska
+kunna plockas ut igen (och algoritmen fastna i en oändlig loop), använder
+jag mig av nyckelelementet (som är ett tecken för alla lövnoder, men som
+är helt oanvänt för de nyskapade föräldernoderna) till att hålla en tuppel
+med det nya huffmanträdet. Detta kan tyckas inte vara den snyggaste lösningen,
+men den fungerar.
+
+\paragraph\
 \begin{verbatim}
-this(X) ->
-    Y = is(X),
-    a(test(Y)).
+{node, Key, Value, Left, Right}
+\end{verbatim}
+Strukturen för en nod i trädet. Key är tecknet i ASCII, Value är frekvensen.
+När ett element extraheras från trädets yttersta vänstergren i prioritetskön
+ersätts det av sin högergren.
+De två lägst prioriterade noderna kopplas ihop genom en föräldernod med
+följande struktur:
+\begin{verbatim}
+{node,
+    {
+        {huffman, Key1, Val1}, 
+        {huffman, Key2, Val2}
+    },
+    Val1 + Val2, null, null
+}
 \end{verbatim}
 
-Var noga med att inte använda tabbar i koden, dessa kommer endast att
-tolkas som ett mellanslag och indenteringen kommer att bli helt fel. 
+Detta nya element integreras sedan med trädet igen genom att placeras på rätt
+ställe i kön.
+
+\paragraph\
+När processen är klar återfinns det färdiga huffmanträdet i köns nu enda
+kvarvarande elements nyckelfält. Detta träd gås igenom inorder
+(vänstergrenen behandlas innan aktuella noden som behandlas innan högergrenen)
+och en kodningstabell upprättas genom att varje tecken tilldelas en bitsträng
+baserad på dess sökväg, enligt ovan. Kodningsfunktionen använder denna tabell
+för att översätta varje tecken i indatatexten till en bitsträng. Tabellen
+ligger i min implementation i en lista, vilket inte är helt optimalt.
+Helt optimalt hade varit en array för konstant uppslagningshastighet. Näst bäst
+(och som dessutom går att implementera i erlang) hade varit att använda ett
+binärt sökträd, på samma sätt som jag gjorde för söktabellen.
+
+\paragraph\
+Gällande avkodningsfunktionen implementerade jag aldrig en avkodningstabell som
+uppgiften föreslog. Detta då huffmanträdet direkt fungerar utmärkt för
+avkodning; indata-bitsträngen avgör sökvägen ner i trädet tills ett löv nås,
+vilket motsvarar ett tecken i ASCII.
+
+\paragraph\
+För prestandamätning använde jag följande funktion från labb 1, som jag
+anpassat till ändamålet:
+
+\begin{verbatim}
+time(Fun)->
+    %% time in micro seconds
+    T1 = now(),
+    Res = Fun(),
+    T2 = now(),
+    {timer, timer:now_diff(T2, T1), Res}.
+\end{verbatim}
+
+Funktionen returnerar en tuppel med både returvärdet från den
+benchmarkade funktionen, samt exekveringstiden.
 
 \section{Utvärdering}
 
-built table 16784 us
-encoded to 144099 bits 6059 us
-raw 271352 bits, decoded 4133 us
+\paragraph\
+Förutom de korta exempeltexterna från uppgiften testade jag min huffman\-
+implementation med två störe texter: en genererad \emph{Lorem Ipsum}-
+text på 34 kB samt en bok -- Victor Hugos Les Misérables, engelsk översättning
+i textformat från Projekt Gutenberg på dryga 3 MB. Resultaten kan ses i
+tabellerna för komprimeringsgrad [Tabell \ref{tab:komprimering}] och
+exekveringstid [Tabell \ref{tab:exekvering}]. I båda försöken användes
+texterna själva som exempeltexter för tabellgenereringen, vilket medför
+optimal komprimering.
 
-built table 775279 us
-encoded to 14587655 bits 1322659 us
-raw 25922720 bits, decoded 353677 us
-
-Uppgifterna i denna kurs kanske inte kräver en utvärdering men man kan
-här visa resultat från testkörningar mm. Om man vill lägga in resultat
-från testkörningar kan man sammanfatta dessa i en tabell. Ett exempel
-kan ses i tabell \ref{tab:results}. 
-
+\paragraph\
+Ett par försök med riktigt litet alfabet gjordes också. Då ett litet alfabet
+redan kan representeras av ett fåtal bitar är effekten av komprimeringen
+mindre -- i vissa fall försummbar.
 
 \begin{table}
 \centering
-\begin{tabular}{|l|r|r|}  
+\begin{tabular}{|l|r|r|r|}
 \hline
-kärnor & tid & uppsnabbning\\
-\hline
-1 & 400ms & 1\\
-\hline
-2 & 240ms & 1.7\\
-\hline
-4 & 140ms & 2.8\\
-\hline
+    Text            & Storlek (Byte)& Komprimerad (Byte)& Komprimeringsgrad \\\hline
+    Lorem Ipsum     & 33919         & 18012             & 53\%              \\\hline
+    Les Misérables  & 3240340       & 1823456           & 56\%              \\\hline
 \end{tabular}
-\caption{Ha alltid en rad som förklarar vad tabellen handlar om.}
-\label{tab:results}
+\caption{Storlek och komprimeringsgrad för de olika texterna}
+\label{tab:komprimering}
 \end{table}
 
-Om ni vill ha med en graf så rekommenderas ni att använda gnuplot. Om
-ni lär er använda det för att göra enkla diagram så kommer ni ha
-mycket nytta av det i framtiden.
+\begin{table}
+\centering
+\begin{tabular}{|l|r|r|r|}
+\hline
+    Text            & Initiering ($\mu s$)  & Komprimering ($\mu s$)& Dekomprimering ($\mu s$)  \\\hline
+    Lorem Ipsum     & 16784                 & 6059                  & 4133                      \\\hline
+    Les Misérables  & 775279                & 1322659               & 353677                    \\\hline
+\end{tabular}
+\caption{Exekveringstider för de olika stegen för de olika texterna}
+\label{tab:exekvering}
+\end{table}
 
+\paragraph\
+Av datan följer att en $100 \times$ ökning i textstorlek medför en $50 \times$
+ökning av exekveringstiden för initieringsteget (generering av tabeller och
+huffmanträd), en $200 \times$ ökning av exekveringstiden för komprimering
+och en $100 \times$ ökning av exekveringstiden för dekomprimering.
+
+\paragraph\
+Koden har uppenbart rum för förbättringar. Som redan nämnt kan komprimerings\-
+funktionen skrivas om till att använda en effektivare datastruktur än en lista
+för att representera omkodningstabellen. Då erlang inte har arrayer på samma
+sätt som till exempel C kan kanske ett träd användas för viss uppsnabbning.
+Erlangs proplists kan också vara ett alternativ som fungerar som uppslagnings\-
+tabell från nyckel till värde.
 
 \section{Sammanfattning}
 
-Vad gick bra och vad gick mindre bra? Vad var de största problemen och
-hur löstes de? Skriv en kort sammanfattning.
+Sammanfattningsvis kag jag säga att även denna övning gick bra, även om en
+del tid och tankekraft behövde läggas ner för att få alla tabeller och träd
+att sitta ihop och bete sig som förväntat. Jag stötte på ett par problem där
+mina träd var vända åt fel håll, och även bitsträngarna som representerar
+bokstäver. Dessa problem kunde dock lösas relativt enkelt, med hjälp av
+spårutskrifter och erlangskalet, men det märks tydligt att det är lätt att
+något blir fel när det är många olika delar som ska passa ihop och språket
+ännu är ganska främmande.
 
 \end{document}
