@@ -1,0 +1,211 @@
+%% En enkel mall för att skapa en labb-raport.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} 
+\usepackage[swedish]{babel}
+\usepackage{verbatim}
+
+\renewcommand{\figurename}{Tabell }
+\textwidth 5.2in
+
+\title{Inlämningsuppgift Laboration 3}
+\author{Axel Isaksson}
+\date{2013-11-27} 
+
+\begin{document}
+
+\maketitle 
+
+\section{Uppgiften}
+
+\paragraph\
+Denna laborationsuppgift gick ut på att växla tågvagnar.
+Ett tåg, bestående av flera (unika) vagnar, skulle kopplas om i en annan
+vagns\-följd genom att växlas mellan tre olika spår i en spårväxel.
+Uppgiften var indelad i sju deluppgifter, varav den sista var frivillig.
+I de första tre uppgifterna implementerades hjälpfunktioner för att manipulera
+listor och flytta vagnar mellan olika spår. Övriga uppgifter gick ut på att,
+givet ett ursprungligt tåg och ett färdigt tåg, utföra en serie 
+vagnsförflyttningar mellan spåren för att från ursprungståget bygga det färdiga
+tåget.
+Det ingick också i de senare uppgifterna att optimera sin funktion, så att det
+färdiga tåget kunde skapas med ett färre antal drag.
+
+\paragraph\
+Spåret i uppgiften är tredelat; det har ett huvudspår där det ursprungliga
+och det färdiga tåget ska stå, samt två hjälpspår som används som temporära
+uppställningsplatser för vagnar som växlas och byter plats. En vagn kan bara
+växlas mellan två hjälpspår genom att först växlas via huvudspåret.
+
+\section{Ansats}
+
+\subsection{Listmanipulering}
+\paragraph\
+Denna delupggift gick ut på att skriva ett par hjälpprocesser för att
+dela en lista vid en viss punkt (och returnera antingen elementen före eller
+efter punkten), slå samman listor samt att i en lista hitta ett specifikt
+element. Detta kändes en aning redundant, då flertalet av dessa funktioner
+redan finns i erlangs lists-bibliotek.
+
+\subsection{Vagnsflytt}
+\paragraph\
+I denna del skulle en funktion för att flytta ett kolli bestående av en
+eller flera (ihopkopplade) vagnar mellan huvudspåret och ett av de övriga
+spåren skapas. Funktionen skulle som argument ta en förflyttningsinstruktion
+och ett ``tillstånd'' bestående av en bangård med vagnarna på de tre spåren
+i form av listor. Denna funktion skulle utföra förflyttningsinstruktionen
+(i stil med ``flytta två vagnar från huvudspåret till sidospår 1'') på
+bangården och returnera ett nytt tillstånd.
+Specifikt skulle förflyttningsinstruktionen vara en tupel bestående av en
+atom för ett av de två sidospåren, samt ett heltal för hur många vagnar som
+skulle flyttas. Talets polaritet skulle bestämma förflyttningens riktning.
+
+\paragraph\
+Funktionen implementerades med hjälpfunktionerna från deluppgift 1.
+En förflyttning från huvudspåret tar bort \emph N vagnar från slutet av
+huvudspårets tåg och placerar dem i början av tåget på det valda hjälp\-
+spåret. På samma sätt medför alltså en förflyttning till huvudspåret att
+\emph N vagnar tar från början av hjälpspårets tåg och kopplas på slutet
+av tåget på huvudspåret.
+
+\subsection{Serieförflyttningar}
+\paragraph\
+Här gick uppgiften ut på att, med hjälp av flyttfunktionen från uppgift 2,
+utföra på ett initialt tillstånd en serie förflyttningar och returnera
+en lista med alla tillstånd som gås igenom under processen. Det första
+elementet i listan skulle vara det initiala tillståndet innan förflyttningarna,
+och det sista elementet det slutgiltiga.
+
+\paragraph\
+Denna funktion kunde enkelt implementeras med rekursion på följande sätt:
+
+\begin{verbatim}
+move([], State) ->
+    [State];
+move([Move | Moves], State) ->
+    [State | move(Moves, single(Move, State))].
+\end{verbatim}
+
+\subsection{Hitta lösningar}
+\paragraph\
+Denna uppgift gick ut på att implementera funktionen \emph{find} som,
+givet ett ursprungligt tåg och ett slutgiltigt tåg, utför en serie vagns\-
+förflyttningar för att transformera det ursprungliga tåget till det
+slutgiltiga. Funktionens returvärde är en lista med förflyttningar som
+utför transformationen.
+
+\paragraph\
+I uppgiften presenterades en rekursiv algoritm som skulle användas:
+Den första vagnen i det slutgiltiga tåget används som referens.
+Ursprungståget (som står på huvudspåret) söks igenom efter denna vagn
+och delas upp på denna position. Alla vagnar efter denna vagn samt
+vagnen själv backas upp på hjälpspår 1. Detta betyder att vagnen som ska
+stå först i det färdiga tåget nu står först på hjälpspår 1. Resten av
+vagnarna på huvudspåret backas nu upp på hjälpspår 2, alla vagnar från
+hjälpspår 1 rullas fram på huvudspåret varvid alla vagnar från spår 2
+åter rullas upp på huvudspåret. Detta har som följd att den sökta första
+vagnen från det färdiga tåget nu står först på huvudspåret. Vagnsekvensen
+efter är oviktig, då funktionen är rekursiv och nu går vidare och behandlar
+nästa vagn som om det vore den första vagnen. Alla vagnar som är färdiga
+kommer alltså stå kvar på huvudspåret, och algoritmen kommer att operera på
+tågets svans. När inga vagnar återstår att behandla är funktionen klar.
+
+\paragraph\
+I min lösing använde jag mig av en hjälpfunktion, \emph{split}, som delar
+upp ett tåg vid en given vagn, som beskrivet ovan. En serie om fyra
+förflyttningar konstrueras sedan genom att, som beskrivet, flytta de olika
+delarna av det uppdelade tåget för att nå det önskade läget; tågets första
+vagn på rätt position. Denna serie förflyttningar byggs sedan på genom
+att funktionen anropar sig själv med de efterföljande vagnarna som
+``ursprungståg'' och återstående vagnar i det slutgiltiga tåget.
+
+\begin{verbatim}
+find([], []) ->
+    [];
+find(Train1, [H2 | T2]) ->
+    {H1, T1} = split(Train1, H2),
+    H1Len = length(H1),
+    T1Len = length(T1),
+    [
+        {one, T1Len + 1},
+        {two, H1Len},
+        {one, -(T1Len + 1)},
+        {two, -H1Len}
+    ] ++ find(T1 ++ H1, T2).
+\end{verbatim}
+
+\subsection{Färre förflyttningar}
+\paragraph\
+Denna deluppgift, som gick ut på att optimera find-funktionen till att inte
+flytta en vagn som redan befinner sig på rätt plats, kunde lösas väldigt
+enkelt genom att lägga till följande funktionsklausul till funktionen från
+den tidigare uppgiften:
+
+\begin{verbatim}
+few([H2 | T1], [H2 | T2]) ->
+    few(T1, T2);
+\end{verbatim}
+
+Observera att funktionen här har bytt namn till \emph{few} istället för
+\emph{find}. Denna nya funktionsklausul gör att om samma element ligger först
+i både vagnslistan för ursprungståget och det slutgiltiga tåget behöver det
+inte växlas fram och tillbaka, utan hoppas över och istället behandlas nästa
+vagn i listan.
+
+\subsection{Komprimeringar}
+\paragraph\
+Den sista uppgiften gick ut på att skriva en funktion som kompakterar en lista
+med förflyttningar till en optimalare lista med färre funktioner.
+Detta skulle lösas med hjälp av två regler:
+
+\begin{itemize}
+    \item Två direkt följande förflyttningar till samma spår kan slås samman
+        till en större förflyttning som flyttar alla vagnar i ett drag.
+    \item En förflyttning av noll vagnar medför ingen operation och kan därför
+        tas bort.
+\end{itemize}
+
+\paragraph\
+Implementationen går igenom listan med förflyttningar och utövar ovan regler
+på varje elementpar om möjligt. Detta görs om igen rekursivt tills dess att
+listan inte förändras längre.
+
+\section{Utvärdering}
+
+\paragraph\
+Uppgiften medförde inte så mycket som kunde utvärderas mer än att given
+indata matchar förväntad utdata. Detta kunde göras genom att låta
+funktionen \emph{move} från deluppgift 3 utföra en sekvens flyttinstruktioner
+från \emph{find} eller \emph{few} och se att det önskade tåget faktiskt
+konstruerats på huvudspåret.
+
+\paragraph\
+För att testa detta skrev jag en liten testfunktion som skapar ett tåg av
+valfri längd vilket ställs på huvudspåret.
+Ett annat tåg, med samma vagnar fast i annan, slumpad ordning skapas och
+används som det ``färdiga'' tåget som ska byggas genom att flytta vagnarna.
+Funktionserna \emph{find} och \emph{few} anropas för att generera varsin
+lista av instruktioner för att lösa uppgiften, och dessa listor skickas till
+\emph{move} som utför dem. Resultatet (sista tillståndet i den returnerade
+listan från \emph{move}) jämförs sedan med målet; det färdiga tåget; för att
+se att korrekt resultat erhölls.
+
+\paragraph\
+I alla de tester jag gjorde, med tåg innehållandes 0 upp till 26 vagnar gav
+både \emph{find} och \emph{few} väntat resultat.
+
+\section{Sammanfattning}
+
+\paragraph\
+Sammanfattningsvis kan sägas att jag tyckte att uppgiften gick bra, men
+att den var en aning tråkig; det var allderles för mycket förklarat
+steg för steg i uppgifterna, vilket gjorde att det var mer mekaniskt
+arbete än tankekraft som behövdes för att nå en lösning. Till exempel
+tycker jag att föregående uppgift om Huffmankodning var betydligt intressantare
+och klurigare, vilket naturligtvis gör uppgiften roligare.
+
+\paragraph\
+Jag tycker också att uppgiften var något svårläst, med många icke-
+förklarande en- och tvåbokstävers variabelnamn som bidrog till en del
+förvirring.
+
+\end{document}

@@ -1,0 +1,247 @@
+%% En enkel mall för att skapa en labb-raport.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} 
+\usepackage[swedish]{babel}
+\usepackage{verbatim}
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{dkblue}{rgb}{0,0,0.5}
+\definecolor{dkyellow}{rgb}{0.5,0.5,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{dkgreen}{rgb}{0,0.5,0}
+\definecolor{dkmagenta}{rgb}{0.5,0,0.5}
+
+\lstset{ %
+    backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+    basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+    breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+    breaklines=true,                 % sets automatic line breaking
+    captionpos=b,                    % sets the caption-position to bottom
+    commentstyle=\color{dkgreen},      % comment style
+    deletekeywords={},            % if you want to delete keywords from the given language
+    escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+    extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+    frame=none,                      % adds a frame around the code
+    keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+    keywordstyle=\bfseries\color{dkblue},       % keyword style
+    %identifierstyle=\color{dkyellow},
+    language=erlang,                 % the language of the code
+    morekeywords={*,...},            % if you want to add more keywords to the set
+    numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+    numbersep=5pt,                   % how far the line-numbers are from the code
+    numberstyle=\tiny\color{gray},   % the style that is used for the line-numbers
+    rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+    showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+    showstringspaces=false,          % underline spaces within strings only
+    showtabs=false,                  % show tabs within strings adding particular underscores
+    stepnumber=1,                    % the step between two line-numbers. If it's 1, each line will be numbered
+    stringstyle=\color{dkmagenta},       % string literal style
+    tabsize=4,                       % sets default tabsize to 2 spaces
+    title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
+
+\renewcommand{\figurename}{Tabell }
+\textwidth 5.1in
+
+\title{Inlämningsuppgift Laboration 6}
+\author{Axel Isaksson}
+\date{2013-12-19} 
+
+\begin{document}
+
+\maketitle 
+
+\section{Uppgiften}
+
+\paragraph\
+Veckans uppgift, och den sista för terminen gick ut på att implementera en så
+kallad \emph{shoutcast}-server. Shoutcast är en utökning av
+\emph{HTTP}-protokollet designat för att strömma musik och internetradio.
+
+\paragraph\
+Uppgiften bestod av flera delar, varav den sista delen lämnade frihet för egna
+utökningar av den enkla shoutcastservern. De tidigare uppgifterna behandlade
+tolkning av HTTP-protokollet, implementationsspecifik metadata för shoutcast
+samt inläsning av \emph{ID3}-taggar från mp3-filer, för att kunna presentera
+spårmetadata så som spårtitel, artist och album.
+
+\section{Ansats}
+
+\subsection{Shoutcast, \emph{ICY}}
+\paragraph\
+I första deluppgiften implementerades en HTTP-tolk och -kodare. Denna
+konstruerades för att kunna hantera inramningsfel som sker när man skickar
+data över \emph{tcp} -- ett datablock kan styckas upp och anlända i flera
+mindre bitar som måste lappas ihop av mottagaren. Mycket kod för den denna
+uppgift var redan given; tolken kan be om mer data från socketen, och genom
+att dessutom skicka tillbaka en högre ordnings-funktion kan den återuppta
+tolkningen av en förfrågan från den avbrutna positionen om ett ej helt block
+läses in.
+
+\paragraph\
+De protokollspecifika detaljer för ICY-protokollet (\emph{I Can Yell},
+internt namn för shoutcast) som skiljer sig från HTTP-standarden är att en
+shoutcastkompatibel klient skickar med en specifik metadata-sträng i
+meddelandehuvudet,
+\begin{verbatim}
+    Icy-MetaData: 1
+\end{verbatim}
+som talar om för servern att den
+hanterar shoutcast-strömmar. Servern skickar i sin tur med strängen
+\begin{verbatim}
+    icy-metaint: BLOCKSIZE
+\end{verbatim}
+i sitt svar, där \emph{BLOCKSIZE} är datablockstorlek i ljudströmmen. 
+Implementationen använder en blockstorlek på 8192 byte och servern skickar
+i meddelandekroppen för svaret block efter block med mp3-data.
+Mellan varje datablock skickas ett
+litet block med metadata, se tabell \ref{tab:meta}. I detta metadata-block
+skickas bland annat strömmens titel kontinuerligt som en textsträng:
+\begin{verbatim}
+StreamTitle='TITEL';
+\end{verbatim}
+
+\begin{table}
+\centering
+\begin{tabular}{|l|r|r|}  
+\hline
+Längd (byte) & 1 & variabel, 16$\times$längdfältet\\
+\hline
+Beskrivning & Längd för följande metadata & Datasträng, nollutfylld\\
+\hline
+\end{tabular}
+\caption{Insprängd shoutcast-metadata}
+\label{tab:meta}
+\end{table}
+
+\subsection{ID3-taggar}
+\paragraph\
+Nästa deluppgift gick ut på att extrahera metadata från ID3-taggen i en
+mp3-fil. Implementationen hanterar bara ID3 version 1. För att vara
+kompatibel med gamla mp3-spelare utan ID3-stöd ligger ID3-taggen som ett
+128 byte stort block i slutet av filen. Blocket börjar med en trebokstävers
+sträng, \emph{TAG}, som identifierare och är sedan indelat i block om 30
+byte för titel, artist och album, följt av ett albumår på fyra byte, ett
+kommentarsfält på ytterligare 30 samt ett genre-fält på en byte.
+I ID3 version 1.1 är de två sista byten av kommentarsfältet reserverade
+som en fast nollbyte samt ett spårnummerfält på en byte.
+
+\paragraph\
+Ett par funktioner skrevs för att öppna en mp3-fil, extrahera ID3-taggen
+samt resten av datan. ID3-taggen delas upp som en lista av nyckel-värdepar
+av i stil med \emph{\{title, ``Track title''\}}.
+
+\subsection{En enkel server}
+\paragraph\
+Den första implementationen är väldigt grundläggande.
+Här läses en mp3-fil in i början av körningen där titelfältet plockas ut
+från ID3-taggen. Resten av mp3-datan styckas upp i 8192 byte stora block
+där det sista, ofullständiga blocket (som ändå är knappt hörbart) förkastas
+av enkelhetsskäl. En socket öppnas nu där servern lyssnar efter anslutningar
+och accepterar den första möjliga. Servern läser och tolkar en HTTP-förfrågan
+från klienten, och skickar till svar ett HTTP-meddelandehuvud tillbaka.
+Efter meddelandehuvudet skickar servern block efter block från mp3-filen,
+varvat med ett metadatablock innehållandes filens spårtitel. Slutligen stängs
+anslutningen.
+
+\subsection{Utökningar och förbättringar}
+\paragraph\
+För att utöka den grundläggande servern valde jag att implementera ett
+webbgränssnitt för val av sång, som dessutom skulle kunna användas av flera
+samtidigt. Då servern är byggd för att använda sockets i aktivt läge, där
+systemet skickar meddelanden till processen som öppnade socketen vid inkommande
+data, valde jag att använda mig av en pott med hanteringstrådar, där en 
+inkommande anslutning tilldelas en tråd för mitt fleranvändarstöd.
+Detta fungerar så att varje hanteringstråd kan vänta på accept från samma
+lyssnings-socket, men bara en av trådarna kommer att tilldelas en ny,
+inkommande anslutning.
+
+\paragraph\
+För att generera en lista över tillgängliga låtar använde jag mig av funktionen
+\emph{file:list\textunderscore dir()} tillsammas med \emph{lists:foldl()}
+för att lista
+innehållet i musikmappen, och filtrera ut alla filer med ändelsen \emph{.mp3}.
+För varje mp3-fil plockas metadatan i ID3-taggen ut och en html-tabell skapas,
+sorterad efter Artist, Album, Spårnummer med alla låtar. Sorteringen sker dock
+på hela HTML-strängen, vilket inte är optimalt, men enkelt att implementera och
+betydligt bättre än en osorterad lista.
+
+\begin{lstlisting}[language=erlang]
+list_directory(Path) ->
+  {ok, Dir} = file:list_dir(Path),
+  Mp3s = lists:foldl(fun(E, Acc) ->
+    case lists:reverse(E) of
+      [$3, $p, $m, $. | _] ->
+        Filename = E,
+        Id3 = mp3:read_tags(Path ++ "/" ++ urldecode(Filename)),
+        ["<tr>\n" ++
+          "<td>" ++ mp3:id3_field(artist, Id3) ++ "</td>\n" ++
+          "<td>" ++ mp3:id3_field(album, Id3) ++ "</td>\n" ++
+          "<td>" ++ mp3:id3_field(track, Id3) ++ "</td>\n" ++
+          "<td>" ++ generate_url(mp3:id3_field(title, Id3), Filename) ++ "</td>\n" ++
+        "</tr>\n" | Acc];
+      _ ->
+        Acc
+    end
+  end, [], Dir),
+  List = lists:flatten(lists:sort(Mp3s)),
+  Response = list_to_binary("<!DOCTYPE html>\n<html>\n<head>\n<title>Streaming server</title>\n</head>\n<body>\n" ++
+    "<h1>Streaming server</h1>\n" ++
+    "<table border=\"1\">\n<tr><th>Artist</th><th>Album</th><th>Track</th><th>Title</th></tr>\n" ++
+    List ++ "</table>\n</body>\n</html>\n"),
+  {dir, byte_size(Response), Response}.
+\end{lstlisting}
+
+\paragraph\
+Servern utökades till att kunna tolka den efterfrågade resursen från
+GET-metoden i klientens HTTP-förfrågan. För resursnamn som börjar på
+\emph{/mp3/} letar servern efter resten av resursnamnet i serverns
+musikmapp. Förfrågan efter webbroten \emph{/} returnerar html-sidan
+med låtlistan, övriga resurser returnerar HTTP-felmeddelande 404.
+När en fil från musikkatalogen efterfrågas läses den in och styckas
+upp för att skickas iväg till klienten. Jag implementerade även stöd
+för att kunna strömma till klienter som inte hanterar shoutcast, genom
+att inte skicka inbakad metadata om inte klienten specifikt ber om den,
+då den annars tolkas som mp3-data och leder till hackig uppspelning.
+
+\section{Utvärdering}
+
+\paragraph\
+Denna enkla server fungerar för mindre tillämpningar med lämnar en del
+utrymme för förbättring. En möjlig utökning kunde vara möjligheten
+att spela upp ett helt album, eller en spellista åt gången. Detta skulle
+kunna realiseras genom att låta servern "klistra ihop" flera mp3-filer i
+minnet genom att öppna nästa fil och börja skicka block från den direkt
+efter att den första filen skickats. Här kan man också passa på att läsa
+in den nya sångtiteln från ID3-taggen och skicka med den med de nya blocken.
+
+\paragraph\
+En annan möjlig förbättring är att bygga en HTML-motor som genererar HTML
+utifrån en trädstruktur som beskriver sidan, istället för att klippa och
+klistra ihop textsträngar. Detta gör det mycket enklare att utöka serverns
+gränssnitt, man kan även använda mallar för att göra det enkelt att ändra
+utseendet, samtidigt som man ser till att följa gällande HTML-standard.
+Detta gör det även relativt enkelt att generera en inloggningssida.
+Genom att kontrollera inloggningsuppgifter mot användarnamn och
+lösenordshash på servern, tillsamans med sessionskakor kan en mer
+``personlig'' sida skapas där användaren kan spara sida spellistor
+i en databas på servern.
+
+\section{Sammanfattning}
+
+\paragraph\
+Sammanfattningsvis kan sägas att denna uppgift var såväl rolig och
+intressant som lärorik. De störe problemen som stöttes på längs vägen
+var bland annat att sockets i aktivt läge bara skickar meddelanden till
+tråden som öppnade socketen genom accept, och inte tråden som sätter
+den i aktivt läge genom \emph{inet:setsocketopt()}, vilket ledde till att
+jag valde att implementera en poolad server istället för att skapa en ny
+tråd för varje anslutning. Andra, smärre problem som upptod var vid
+inläsning av ID3-taggarna då olika datatyper hanterar sin storlek olika
+(i bitar eller byte), samt att storleken för den insprängda medadatan
+räknades ut felaktigt, vilket ledde till hackig uppspelning. Dessa problem
+löstes emellertid enkelt genom en titt i dokumentationen för uppfriskning av 
+minnet.
+
+\end{document}

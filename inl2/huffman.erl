@@ -58,18 +58,18 @@ freq([H|T], Tree) ->
 	freq(T, freq_increase_or_add(H, Tree)).
 
 huffman({node, K, V, null, null}) ->
-	{fulhakk, K, V};
+	{huffman, K, V};
 huffman(Freq) ->
 	{freq, K1, V1, F1} = freq_pop_lowest(Freq),
 	{freq, K2, V2, F2} = freq_pop_lowest(F1),
-	huffman(freq_insert({node, {{fulhakk, K1, V1}, {fulhakk, K2, V2}}, V1 + V2, null, null}, F2)).
+	huffman(freq_insert({node, {{huffman, K1, V1}, {huffman, K2, V2}}, V1 + V2, null, null}, F2)).
 
 codes(Huffman) ->
 	codes(Huffman, []).
 
-codes({fulhakk, {Left, Right}, _}, Bits) ->
+codes({huffman, {Left, Right}, _}, Bits) ->
 	codes(Left, Bits ++ [0]) ++ codes(Right, Bits ++ [1]);
-codes({fulhakk, Key, _}, Bits) ->
+codes({huffman, Key, _}, Bits) ->
 	[{code, Key, Bits}].
 
 table(Sample) ->
@@ -87,16 +87,16 @@ encode(Text, Table) ->
 decode(Seq, Tree) ->
 	decode(Seq, Tree, Tree).
 
-decode([], _, {fulhakk, {_, _}, _}) ->
+decode([], _, {huffman, {_, _}, _}) ->
 	[];
-decode([], _, {fulhakk, Key, _}) ->
+decode([], _, {huffman, Key, _}) ->
 	[Key];
-decode([H | Seq], Tree, {fulhakk, {Left, Right}, _}) ->
+decode([H | Seq], Tree, {huffman, {Left, Right}, _}) ->
 	case H of
 		0 -> decode(Seq, Tree, Left);
 		1 -> decode(Seq, Tree, Right)
 	end;
-decode(Seq, Tree, {fulhakk, Key, _}) ->
+decode(Seq, Tree, {huffman, Key, _}) ->
 	[Key | decode(Seq, Tree, Tree)].
 
 test() ->
@@ -105,7 +105,7 @@ test() ->
 	Text = text(),
 	{timer, TimeEnc, Seq} = time(fun() -> encode(Text, Table) end),
 	{timer, TimeDec, Out} = time(fun() -> decode(Seq, Tree) end),
-	io:format("built table ~w us~nencoded to ~w bits ~w us~nraw ~w bits, decoded ~w us~n", [TimeTable, length(Seq), TimeEnc, length(Text)*8, TimeDec]),
+	io:format("built table ~w us~nencoded to ~w bits ~w us~nraw ~w bits, decoded ~w us~n", [TimeTable, length(Seq), TimeEnc, length(Text)*8, TimeDec]).
 	%Out.
 
 time(Fun)->

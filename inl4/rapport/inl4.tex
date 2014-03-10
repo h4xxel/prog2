@@ -1,0 +1,159 @@
+%% En enkel mall för att skapa en labb-raport.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} 
+\usepackage[swedish]{babel}
+\usepackage{verbatim}
+\usepackage{hyperref}
+
+\renewcommand{\figurename}{Tabell }
+
+\title{Inlämningsuppgift Laboration 4}
+\author{Axel Isaksson}
+\date{2013-12-04} 
+
+\begin{document}
+
+\maketitle 
+
+\section{Uppgiften}
+
+\paragraph\
+Laborationsuppgiften gick ut på, att som en grundläggande övning i
+distribuerade system, simulera en modell med ätande filosofer vid ett runt
+bord. Mellan varje par filosofer ligger \emph{en} ätpinne, och varje filosof
+måste ha två pinnar för att kunna äta. Då filosoferna, utöver att äta, även
+sitter och filosoferar, kan två filosofer dela på ätpinnen mellan sig.
+
+\paragraph\
+De senare deluppgifterna gick ut på att lösa och diskutera olika problem som
+uppstod, bland annat när hela systemet låste sig på grund av att varje filosof
+kunde plocka upp en ätpinne och sedan i oändlighet vänta på den andra.
+
+\section{Ansats}
+
+\paragraph\
+De första tre deluppgifterna gick ut på att implementera det grundläggande
+systemet med fem filosofer och fem ätpinnar. Varje ätpinne och varje filosof
+skulle köra som en egen process där varje ätpinne håller sitt eget tillstånd
+(ledig eller upptagen). Filosoferna plockar upp och lägger tillbaka pinnarna
+genom att meddelanden skickas mellan processerna så att pinnarna byter
+tillstånd. Genom att på detta sätt använda Erlangs processhantering
+blir systemet lätt att implementera, och filosoferna kommer automatiskt att
+vänta på att en ätpinne blir ledig genom Erlangs meddelandekö.
+
+\paragraph\
+Följande uppgifter gick ut på att experimentera med systemet för att göra det
+mer stabilt, samt minimera risken för stillestånd. Systemet i den första
+versionen initierade med fem lediga ätpinnar och fem ``tänkande'' filosofer.
+När alla dessa filosofer tänkt klart plockade de alla upp sin vänstra
+ätpinne, vilket ledde till stillestånd då alla väntade på att få sin högra
+ätpinne ledig.
+
+\paragraph\
+Den första, och något naiva, lösningen till detta problem var att introducera
+ett slumpelement: längen på varje filosofs tänk- och ätcykel baseras på ett
+slumpvärde, vilket minskar risken för att filosoferna låser varandra.
+Anledningen till att lösningen är naiv är att den inte egentligen löser
+problemet, utan istället försöker gå runt det och ``hoppas'' att det fungerar.
+I princip har bara mer indeterminism tillförts vilket kör att vi inte längre
+kan säga när systemet kommer fungera eller inte, vilket är långt från önskvärt.
+
+\paragraph\
+Nästa steg var att lägga till en timeout när filosoferna väntar på ätpinnarna.
+En filosof som väntat för länge på en ätpinne ger upp, lägger ner sin andra
+ätpinne om han höll i någon, och återgår till att tänka ett tag till.
+Problemet med denna lösning är, att utan ett slumpelement så kommer denna
+lösning fungera på precis samma sätt som den första. Om filosoferna sträcker
+sig efter sin vänstra ätpinne samtidigt, och sedan väntar precis lika länge
+på att sin högra pinne ska bli ledig innan de ger upp och lägger ner
+vänsterpinnen, kommer systemet fortfarande att låsa sig. I kombination med
+slumpvärden för väntetider och timeouts fungerar dock systemet utan att låsa
+sig, men med minskat genomflöde på grund av onödiga väntetider. Det gäller
+dock att vara aktsam på att förfrågan om att plocka upp ätpinnen från en
+filosof som når timeout och ger upp fortfarande ligger kvar i pinnens
+meddelandekö, och måste rensas ut eller ignoreras för att inte orsaka
+senare problem genom att pinnen låser sig till en filosof som inte längre
+är intresserad av den.
+
+\paragraph\
+Det tredje steget för att förbättra systemet var att använda
+asynkron kommunikation mellan filosoferna och ätpinnarna. Detta innebär att
+filosoferna skickar iväg meddelanden för att plocka upp båda ätpinnarna
+``samtidigt'' och sedan väntar tills dess att pinnarna blir lediga, i stället
+för att först plocka upp den ena och sedan den andra. På detta sätt minskas
+onödiga väntetider, och mer dynamik införs i systemet som medför bättre
+konflikthantering då filosoferna kan plocka upp vilken som av pinnarna när
+de blir lediga.
+
+\paragraph\
+Ett centraliserat system presenterades sedan där en ``servitör'' ansvarar för
+att dela ut pinnar till de ätande filosoferna.
+Då varje filosof behöver exakt två pinnar för att kunna äta innebär min lösning
+att ätpinnarna delas ut i par av servitören. Filosoferna, när de vill
+börja äta, ställer sig i kö hos servitören i väntan på ett par ätpinnar.
+Servitören delar ut sina två par ätpinnar till de första i kön, och delar sedan
+flygande ut ätpinnarna parvis till nästvidkommande i kön så fort ett par lämnats
+tillbaka från en filosof som ätit klart. Så länge filosoferna lämnar tillbaka
+sina ätpinnar när de är klara låser sig inte systemet. En kö bildas dock med
+filosofer som bara sitter och väntar på att ett par ätpinnar ska bli
+tillgängliga, vilket tar tid från deras filosoferande, även om användandet av
+pinnarna optimeras.
+
+\section{Utvärdering}
+
+\paragraph\
+För ett litet system med få noder, som dessutom inte är tidskritiskt kan
+ett system som baserar sig på slumpmässiga timeouts och väntetider fungera.
+Som exempel kan tas ALOHAnet\footnotemark[1] som använder slumpmässiga
+väntetider för att hantera krockar.
+När det dock gäller större system med fler noder som medför fler krockar,
+eller i system där högre datagenomströmning krävs så att artificiella
+väntetider är oacceptabelt måste en annan lösning finnas.
+
+\paragraph\
+Man skulle kunna tänka sig flera lösningar på detta problem. I uppgiften
+föreslogs en centraliserad lösning med en ``servitör'' som kan på begäran av
+en filosof dela ut ett par ätpinnar. En annan lösning är en decentraliserad
+modell där filosoferna runt bordet kan fråga varandra om de får låna ätpinnar.
+I denna modell måste filosoferna dels kunna ``hitta'' varandra och sedan genom
+kommunikation sinsemellan komma överens om vem som ska få använda ätpinnarna
+och när. Ett sådant system är svårare att designa, men lämpar sig väl
+för applikationer i större skala; systemet ska kunna fortsätta att fungera
+oberoende av den centrala noden (här: servitören) ifall den skulle gå ner.
+
+\paragraph\
+En mer praktisk och lätthanterlig lösning är en hybrid där noderna använder
+en central nod för att finna varandra, men kan sedan kommunicera sinsemellan.
+Systemet kan fungera flytande, utan central nod, kortare stunder om denna
+skulle gå ner, men noderna måste då och då skynkronisera sin ``adressbok''
+med den centrala servern för att till exempel hitta nya noder. Man skulle
+även kunna tänka sig ett nätverk av grannar. I filosofuppgiften skulle det
+innebära att en filosof som inte har tillgång till sina ätpinnar kan fråga
+sina bordsgrannar, och låta förfrågan vandra runt från nod till nod tills
+dess att man finner en ledig ätpinne som kan skickas tillbaka. Nackdelarna
+med ett sådant system är bland annat (för att fortsätta med filosof-analogin)
+att en filosof som plötsligt lämnar bordet bryter kedjan, samt att filosoferna,
+som varken vill bli störda när de tänker eller prata med mat i munnen, inte kan
+vidarebefodra ett meddelande förns de är klara. För att öka både redundans
+och kapacitet måste varje nod ha fler grannoder i nätverket, så att det finns
+alternativa vägar mellan noder och så nätverket kan reparera sig själv om en
+nod tappar anslutningen.
+
+\footnotetext[1]{ALOHAnet - Wikipedia, the free encyclopedia
+    \url{https://en.wikipedia.org/wiki/ALOHAnet}}
+
+\section{Sammanfattning}
+
+\paragraph\
+För att sammanfatta den här uppgiften kan sägas att jag fann den konceptuellt
+mycket intressant, och även om det inte var så mycket kod att skriva, så
+lämnade uppgiften rum för mycket eget experimenterande och diskuterande.
+
+\paragraph\
+Ett par mindre problem uppstod längs vägen, till exempel att varje process
+initieras med samma slumpfrö, vilket ledde till att slumporganiseringen
+av processerna inte fungerade. Detta löstes dock enkelt genom att låta varje
+filosofprocess initiera sin slumpgenerator med hjälp av Erlangs inbyggda
+\emph{now}-funktion som garanterar ett unikt värde varje anrop.
+
+\end{document}

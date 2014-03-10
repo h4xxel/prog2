@@ -1,0 +1,256 @@
+%% En enkel mall för att skapa en labb-raport.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} 
+\usepackage[swedish]{babel}
+\usepackage{verbatim}
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{dkblue}{rgb}{0,0,0.5}
+\definecolor{dkyellow}{rgb}{0.5,0.5,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{dkgreen}{rgb}{0,0.5,0}
+
+\lstset{ %
+    backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+    basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+    breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+    breaklines=true,                 % sets automatic line breaking
+    captionpos=b,                    % sets the caption-position to bottom
+    commentstyle=\color{dkgreen},      % comment style
+    deletekeywords={},            % if you want to delete keywords from the given language
+    escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+    extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+    frame=none,                      % adds a frame around the code
+    keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+    keywordstyle=\bfseries\color{dkblue},       % keyword style
+    %identifierstyle=\color{dkyellow},
+    language=erlang,                 % the language of the code
+    morekeywords={*,...},            % if you want to add more keywords to the set
+    numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+    numbersep=5pt,                   % how far the line-numbers are from the code
+    numberstyle=\tiny\color{gray},   % the style that is used for the line-numbers
+    rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+    showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+    showstringspaces=false,          % underline spaces within strings only
+    showtabs=false,                  % show tabs within strings adding particular underscores
+    stepnumber=1,                    % the step between two line-numbers. If it's 1, each line will be numbered
+    stringstyle=\color{blue},       % string literal style
+    tabsize=4,                       % sets default tabsize to 2 spaces
+    title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
+
+\renewcommand{\figurename}{Tabell }
+
+\title{Inlämningsuppgift Laboration 5}
+\author{Axel Isaksson}
+\date{2013-12-11}
+
+\begin{document}
+
+\maketitle 
+
+\section{Uppgiften}
+
+\paragraph\
+Denna laborationsuppgift gick ut på att konstruera en enkel webbserver, och
+jämföra olika sätt att hantera samtidiga förfrågningar från flera klienter.
+I uppgiften ingick att kunna tolka den vanligaste typen av meddelande i
+HTTP-protokollet; \emph{GET}-meddelandet, samt att kunna generera ett svar
+att skicka tillbaka. Följande metoder jämfördes för att hantera multipla,
+samtidiga anslutningar:
+
+\begin{itemize}
+    \item Sekvensiell hantering: förfrågningar hanteras en i taget.
+    \item Samtidig hantering: varje förfrågan hanteras i en bakgrundsprocess.
+    \item Fast antal hanteringsprocesser: förfrågningar tilldelas en
+        hanteringsprocess från en fast, delad pott. När inga lediga
+        hanteringsprocesser finns köläggs förfrågan.
+\end{itemize}
+
+\section{Ansats}
+
+\subsection{HTTP-tolk}
+
+\paragraph\
+De första deluppgiften gick ut på att skriva hjälpfunktioner för att tolka
+och svara på HTTP-förfrågningar. Då uppgiften endast gick ut på att skapa
+en minimal webbserver i övningssyfte hanteras bara \emph{GET}-metoden,
+och eventuell metadata i meddelandehuvudet ignoreras. Stora delar av denna
+kod var redan given i uppgiften.
+
+\paragraph\
+HTTP är ett radbaserat protokoll i klartext (det vill säga ej binärt protokoll)
+där varje meddelande består av ett meddelande huvud och en meddelandekropp.
+Meddelandehuvudet inleds med en förfrågan (metod) eller ett svar på första raden
+och följs av metadata i nyckel/värde-par; ett per rad.
+Varje rad avslutas med ett vagnsreturtecken och ett nyradstecken
+(förkortat \emph{CRLF}). Meddelandehuvudet skiljs från meddelandekroppen
+med en tom rad, bestående av endast \emph{CRLF}.
+
+\paragraph\
+HTTP-tolken från första deluppgiften läser ett meddelande rad för rad och
+extraherar de olika delarna. Från första raden plockas typen av förfrågan ut.
+Implementationen från uppgiften hanterar bara \emph{GET}-förfrågningar som
+överensstämmer med HTTP-versionerna 1.0 och 1.1. Ur denna rad extraheras också
+sökvägen till den den efterfrågade filen. Följande rader fram till den tomma
+raden läses och läggs i en lista med metadata. Resterande rader exkluderat den
+tomma tillhör meddelandekroppen. Denna data returneras i en tupel som
+\emph{\{Request, Headers, Body\}}. Nedan följer ett exempel på en
+HTTP-förfrågan:
+
+\begin{verbatim}
+    GET /path/to/file.txt HTTP/1.1
+    Metadata-Key: Value
+    Another-Key: Value
+    
+    Message body, may be empty
+\end{verbatim}
+
+\subsection{En enkel server}
+
+\paragraph\
+Nästa deluppgift gick ut på att implementera en enkel server som kunde ta emot
+en HTTP-förfrågan och skicka tillbaka ett svar. Till detta används
+\emph{sockets} (löst översatt; ändpunkter) som för programmet är den synliga
+delen av en förbindelse till exempel mellan två datorer på internet,
+men kan även använas lokalt.
+Till detta användes i uppgiften Erlangs \emph{gen\_tcp}-bibliotek.
+
+\paragraph\
+Den första iterationen av servern implementerades helt sekvensiellt. En socket
+öppnas som lyssnar efter nya anslutningar. När en klient ansluter till servern
+accepteras anslutningen och dess förfrågan hanteras. Denna förfrågan behandlas
+genom en ny socket som erhålles av accept-funktionen. När klientens förfråga är
+behandlad skickas ett svar tillbaka och denna klient-socket stängs. Servern kan
+nu acceptera nästa anslutning. Koden för denna deluppgift var också till stora
+delar redan given.
+
+\subsection{En testklient}
+
+\paragraph\
+I den tredje deluppgiften implementerades en liten testklient för att mäta
+serverns prestanda. Klienten skickar ett flertal förfrågningar
+(som standard 100) och räknar tiden det tar att få ett svar.
+Koden för även denna deluppgift var redan given.
+
+\subsection{Ökad serverkapacitet}
+
+\paragraph\
+För att förbättra serverns kapacitet att kunna hantera flera klienter
+samtidigt undersöktes i denna deluppgift två olika metoder att
+parallellisera hanteringen av förfrågningar.
+
+\paragraph\
+Den första metoden gick ut på att låta varje förfrågan hanteras av en egen
+process. Då en ny socket öppnas för varje accept kan en process skapas som
+hanterar kommunikation genom denna socket; läser förfrågan, svarar, stänger
+socketen och avslutar. På detta sätt kan flera samtidiga anslutningar hanteras
+utan onödiga väntetider. Nackdelar med denna metod är att det finns ett visst
+overhead för att skapa en process, både tismässigt och sett till
+systemets minnesanvändning. Detta öppnar också för möjligheten till en
+``Denial Of Service''-attack där en anfallare enkelt kan översvämma systemet
+med processer som förbrukar systemresurser.
+
+\paragraph\
+Den andra metoden gick ut på att, från en pott med ett fast antal
+``arbetsprocesser'', tilldela en arbetsprocess till en inkommande förfrågan.
+När potten är tom köläggs nya förfrågningar tills en process blir ledig.
+I min lösning realiserade jag det genom att använda mig av en LIFO-stack
+med arbetsprocesser, som hanteras av en övervakare. Vid en accept
+skickas ett meddelande till övervakaren med den tilldelade socketen.
+övervakaren tilldelar anslutningen till den första, lediga arbetsprocessen
+i stacken, genom att ett meddelande skickas till processen och den tas bort
+ur listan med tillgängliga arbetare. När arbetsprocessen har hanterat och
+svarat på klientens förfrågan skickar den ett meddelande till övervakaren
+där den talar om att den åter är ledig, varpå den läggs på stacken igen.
+Anledningen till att jag valde en stack som datastruktur är för att de
+stämmer bra överens med erlangs implementation av listor; det går snabbt
+att både ta bort och lägga till det första elementet i en lista, och det
+spelar ingen roll vilken process som hanterar vilken förfrågan.
+
+\begin{lstlisting}[language=erlang]
+pool([]) ->
+    receive
+        {done, Pid} ->
+            pool([{handler, Pid}])
+    end;
+pool(Handlers) ->
+    receive
+        {accept, Sock} ->
+            [{handler, Pid} | T] = Handlers,
+            Pid ! {handle, Sock, self()},
+            pool(T);
+        {done, Pid} ->
+            pool([{handler, Pid} | Handlers])
+    end.
+\end{lstlisting}
+
+Kod för övervakarfunktionen. Funktionen tar emot \emph{accept}-meddelanden
+från huvudprocessen som lyssnar efter nya, inkommande anslutningar och
+tilldelar dem till lediga arbetsprocesser. Funktionen tar även emot
+\emph{done}-meddelanden från färdiga arbetsprocesser som åter igen ska läggas
+på stacken och göras tillgängliga för nya förfrågningar.
+
+\section{Utvärdering}
+
+\paragraph\
+Prestandamätning utfördes för de olika servrarna. Resultaten följer i tabell
+\ref{tab:results}. All prestandamätning skedde med en artificiell väntetid
+på $10 ms$ för att simulera filsystemåtkomst och skriptning hos en riktig
+webbserver. I mätningen kördes server och klient på två olika, fysiska
+maskiner, varför en okänd och variabel väntetid för att skicka paketen över
+nätverket kan ha påverkat resultatet. Numren är normaliserade över flera
+körningar.
+
+\begin{table}
+\centering
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+                & Sekvensiell   & Samtidig  & \multicolumn{2}{|c|}{Arbetsprocesser}\\
+\hline
+Processer       & 1             & $\infty$      & 10            & 50            \\
+Förfrågningar   &               &               &               &               \\
+\hline
+1               & 4502 $\mu$s  & 4459 $\mu$s   & 4052 $\mu$s   & 3875 $\mu$s   \\
+\hline
+10              & 8707 $\mu$s  & 8953 $\mu$s   & 11181 $\mu$s  & 15986 $\mu$s  \\
+\hline
+50              & 30081 $\mu$s  & 34193 $\mu$s  & 32197 $\mu$s  & 35127 $\mu$s  \\
+\hline
+100             & 106898 $\mu$s & 58938 $\mu$s  & 63075 $\mu$s  & 63312 $\mu$s  \\
+\hline
+\end{tabular}
+\caption{Prestandamätning av de olika servrarna}
+\label{tab:results}
+\end{table}
+
+\paragraph\
+Från tabellen kan utläsas att för få antal samtida förfrågningar presterar de
+olika servrarna relativt lika. För högre belastning presterar servrarna
+med flera processer något bättre än den sekvensiella servern, men resultaten är
+förvånansvärt lika, något som kan ha att göra med hur erlang hanterar sina
+processer. Värt att notera är också att för de testkörningar jag gjorde
+med server och klient i samma erlangskal (resultat ej med i tabell)
+tog körningar med endast tio samtidiga förfrågningar mellan en och två
+\emph{sekunder} att slutföra, för samtliga servrar.
+
+\section{Sammanfattning}
+
+\paragraph\
+Sammanfattningsvis kan sägas att resultatet av försöken var något oväntat;
+jag hade förväntat mig större skilnad i prestanda mellan den sekvensiella
+och de parallella servrarna för flera samtidiga anslutningar.
+Prestandavinst och andra fördelar med en flerprocessig lösning
+går dock naturligtvis fortfarande att finna för verkliga
+användningsområden, där servern faktiskt läser stora filer från filsystmet,
+eller kör tunga skript för vissa förfrågningar. I dessa fall ska inte servern
+låsa sig med endast den tidskrävande förfrågningen, och låta alla andra
+klienter vänta tills dess att den är klar.
+
+\paragraph\
+Angående uppgiften så tycker jag att den var lärorik och ganska rolig, fast
+jag även denna gång hoppats på lite mindre färdig kod i uppgiften.
+Inga större problem stöttes heller på under arbetet.
+
+\end{document}
